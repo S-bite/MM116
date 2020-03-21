@@ -239,7 +239,7 @@ void changePos(Tactics &tact)
         tact.pos[ri] = {ry, rx};
     }
 }
-int mag;
+lld mag;
 void changeCol(Tactics &tact)
 {
     rep(i, 1)
@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
     p = atof(argv[1]);
     n = atoi(argv[2]);
     int seed = atoi(argv[3]);
-    mag = atoi(argv[4]);
+    mag = atof(argv[4]);
 
     /*
     if (argc == 4)
