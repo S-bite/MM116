@@ -35,6 +35,8 @@ class Tactics
 public:
     int h, w;
     lld score;
+    lld lossinessScore;
+    lld compressionScore;
     vector<string> g;
     vector<PII> pos;
     Tactics(){};
@@ -73,7 +75,7 @@ int evalPiece(Tactics &tact, Tile &tile, PII pos)
 void fitPosAndEval(Tactics &tact)
 {
     tact.score = 0;
-    lld compressionScore = (lld)tact.h * tact.w / (lld)t;
+    tact.compressionScore = (lld)tact.h * tact.w / (lld)t;
     lld sumdiff = 0;
     rep(i, n)
     {
@@ -111,13 +113,13 @@ void fitPosAndEval(Tactics &tact)
         sumdiff += bestscore;
         tact.pos[i] = {sy, sx};
     }
-    lld lossinessScore = sumdiff / ((lld)12.5 * t);
-    tact.score = compressionScore * p + lossinessScore * (1 - p);
+    tact.lossinessScore = sumdiff / ((lld)12.5 * t);
+    tact.score = tact.compressionScore * p + tact.lossinessScore * (1 - p);
 }
 void fitColorAndEval(Tactics &tact)
 {
     tact.score = 0;
-    lld compressionScore = (lld)tact.h * tact.w / (lld)t;
+    tact.compressionScore = (lld)tact.h * tact.w / (lld)t;
     lld sumdiff = 0;
     vector<vector<vector<int>>> tmp(tact.h, VVI(tact.w, VI(0)));
     rep(i, n)
@@ -156,8 +158,9 @@ void fitColorAndEval(Tactics &tact)
                 sumdiff += abs(med - col);
         }
     }
-    lld lossinessScore = sumdiff / ((lld)12.5 * t);
-    tact.score = compressionScore * p + lossinessScore * (1 - p);
+
+    tact.lossinessScore = sumdiff / ((lld)12.5 * t);
+    tact.score = tact.compressionScore * p + tact.lossinessScore * (1 - p);
 }
 
 void init()
@@ -239,7 +242,41 @@ void changePos(Tactics &tact)
         tact.pos[ri] = {ry, rx};
     }
 }
-lld mag;
+
+lld f(int n)
+{
+    return (lld)6.5 * n - 6.0;
+}
+
+void printWrapCount(Tactics &tact)
+{
+    vector<vector<vector<int>>> tmp(tact.h, VVI(tact.w, VI(0)));
+
+    rep(i, n)
+    {
+        auto tile = tiles[i];
+        auto pos = tact.pos[i];
+        rep(y, tile.h)
+        {
+            rep(x, tile.w)
+            {
+                tmp[pos.first + y][pos.second + x].push_back(tile.g[y][x]);
+            }
+        }
+    }
+    lld rough = 0;
+    rep(i, tact.h)
+    {
+        rep(j, tact.w)
+        {
+            cerr << tmp[i][j].size() << " ";
+            rough += f(tmp[i][j].size());
+        }
+        cerr << endl;
+    }
+    cerr << fixed << setprecision(18) << (rough / (12.5 * t)) << endl;
+}
+
 void changeCol(Tactics &tact)
 {
     rep(i, 1)
@@ -258,16 +295,12 @@ Tactics search(int mh, int mw)
     rep(j, 50)
     {
         Tactics base;
-        initTactics(base, mh * (1 + mag * urand(mt) * p), mw * (1 + mag * urand(mt) * p));
+        initTactics(base, mh, mw);
         //initTactics(base, mh * (6), mw * (6));
         fitColorAndEval(base);
         pque.push(base);
     }
-#ifdef LOCAL
-    while (loop != LOOPNUM)
-#else
     while (double(clock() - starttime) / CLOCKS_PER_SEC < 9)
-#endif
     {
         auto tmp = pque;
         while (!pque.empty())
@@ -293,6 +326,29 @@ Tactics search(int mh, int mw)
 #endif
     }
     return pque.top();
+}
+
+lld estimateScore(lld area)
+{
+    return (lld)area / (lld)t * p + max((lld)0, (13.0 / 25.0 - (12.0 / 25.0) * ((lld)area / (lld)t) * (1 - p)));
+}
+
+lld getOptimalArea(int mh, int mw)
+{
+    lld optimalArea = 0;
+    lld curArea = mh * mw;
+    lld optimalEstimatedScore = 1010101;
+    while (curArea <= 100 * 100)
+    {
+        lld curScore = estimateScore(curArea);
+        if (curScore < optimalEstimatedScore)
+        {
+            optimalEstimatedScore = curScore;
+            optimalArea = curArea;
+        }
+        curArea++;
+    }
+    return optimalArea;
 }
 
 void runtest(int seed)
@@ -325,8 +381,19 @@ void runtest(int seed)
         chmax(mh, tile.h);
         chmax(mw, tile.w);
     }
+    lld optimalArea = getOptimalArea(mh, mw);
+    chmax(optimalArea, (lld)100.5);
+    mh = 10;
+    mw = optimalArea / mh;
     auto best = search(mh, mw);
-    cerr << mag << "," << n << "," << seed << "," << best.score << endl;
+    cerr << "N = " << n << " ,P = " << p << " ,Seed = " << seed << endl;
+    cerr << "areaOfTiles     : " << t << endl;
+    cerr << "areaOfAnswer    : " << best.h * best.w << endl;
+    cerr << "compressionScore: " << fixed << setprecision(18) << best.compressionScore << endl;
+    cerr << "lossinessScore  : " << fixed << setprecision(18) << best.lossinessScore << endl;
+    cerr << "rawScore        : " << fixed << setprecision(18) << best.score << endl;
+    cerr << "loop              : " << loop << endl;
+    //printWrapCount(best);
 }
 int main(int argc, char *argv[])
 {
@@ -334,18 +401,16 @@ int main(int argc, char *argv[])
     //cerr << "local test. loop " << LOOPNUM << " times." << endl;
     p = atof(argv[1]);
     n = atoi(argv[2]);
-    int seed = atoi(argv[3]);
-    mag = atof(argv[4]);
-
-    /*
-    if (argc == 4)
+    int seed;
+    if (argc == 3)
     {
-        seed = atoi(argv[3]);
+        seed = mt();
     }
     else
     {
-        seed = mt();
-    }*/
+        seed = atoi(argv[3]);
+    }
+
     //cerr << "P=" << p << " N=" << n << " seed=" << seed << endl;
     runtest(seed);
 #else
@@ -357,9 +422,10 @@ int main(int argc, char *argv[])
         chmax(mh, tile.h);
         chmax(mw, tile.w);
     }
-    //mh = (lld)mh * (1.8 - p);
-    //mw = (lld)mw * (1.8 - p);
-
+    lld optimalArea = getOptimalArea(mh, mw);
+    cerr << n << " " << p << " " << t << endl;
+    cerr << optimalArea << endl;
+    mw = max((int)(optimalArea / mh), mw);
     Tactics ans = search(mh, mw);
     printTactics(ans);
 
