@@ -186,12 +186,39 @@ void init()
     }
 }
 
+int calcWrapNum(vector<vector<set<int>>> &g, Tile &tile, int y, int x)
+{
+    int ret = 0;
+    rep(i, y, y + tile.h)
+    {
+        rep(j, x, x + tile.w)
+        {
+            auto tmp = g[i][j];
+            tmp.insert(tile.g[i - y][j - x]);
+            ret += tmp.size();
+        }
+    }
+    return ret;
+}
+void updateWrapNum(vector<vector<set<int>>> &g, Tile &tile, int y, int x)
+{
+    rep(i, y, y + tile.h)
+    {
+        rep(j, x, x + tile.w)
+        {
+            g[i][j].insert(tile.g[i - y][j - x]);
+        }
+    }
+}
+
 void initTactics(Tactics &tact, int mh, int mw)
 {
+
     tact.h = mh;
     tact.w = mw;
     tact.g.resize(tact.h);
     tact.pos.resize(n);
+    vector<vector<set<int>>> wrapTile(tact.h, vector<set<int>>(tact.w));
 
     rep(i, mh)
     {
@@ -200,17 +227,42 @@ void initTactics(Tactics &tact, int mh, int mw)
             tact.g[i] += 'A' + mt() % 26;
         }
     }
+    VI order(n);
+    rep(i, n) order[i] = i;
+    shuffle(ALL(order), mt);
     rep(i, n)
     {
-        int y;
-        int x;
-        do
+        auto tile = tiles[order[i]];
+        int minimumWrapNum = 1010101;
+        rep(y, tact.h)
         {
-            y = mt() % mh;
-            x = mt() % mw;
-        } while (canPut(tact, tiles[i], y, x) == false);
-        tact.pos.push_back({y, x});
+            rep(x, tact.w)
+            {
+                if (canPut(tact, tile, y, x) == false)
+                    break;
+                int curWrapNum = calcWrapNum(wrapTile, tile, y, x);
+                if (curWrapNum < minimumWrapNum)
+                {
+                    minimumWrapNum = curWrapNum;
+                    tact.pos[order[i]] = {y, x};
+                }
+            }
+            if (canPut(tact, tile, y, 0) == false)
+                break;
+        }
+        auto pos = tact.pos[order[i]];
+        updateWrapNum(wrapTile, tile, pos.first, pos.second);
+        //cerr << pos.first << " " << pos.second << endl;
     }
+    /*
+    rep(i, mh)
+    {
+        rep(j, mw)
+        {
+            cerr << wrapNum[i][j] << " ";
+        }
+        cerr<<endl;
+    }*/
 }
 
 void printTactics(Tactics &tact)
@@ -243,40 +295,6 @@ void changePos(Tactics &tact)
     }
 }
 
-lld f(int n)
-{
-    return (lld)6.5 * n - 6.0;
-}
-
-void printWrapCount(Tactics &tact)
-{
-    vector<vector<vector<int>>> tmp(tact.h, VVI(tact.w, VI(0)));
-
-    rep(i, n)
-    {
-        auto tile = tiles[i];
-        auto pos = tact.pos[i];
-        rep(y, tile.h)
-        {
-            rep(x, tile.w)
-            {
-                tmp[pos.first + y][pos.second + x].push_back(tile.g[y][x]);
-            }
-        }
-    }
-    lld rough = 0;
-    rep(i, tact.h)
-    {
-        rep(j, tact.w)
-        {
-            cerr << tmp[i][j].size() << " ";
-            rough += f(tmp[i][j].size());
-        }
-        cerr << endl;
-    }
-    cerr << fixed << setprecision(18) << (rough / (12.5 * t)) << endl;
-}
-
 void changeCol(Tactics &tact)
 {
     rep(i, 1)
@@ -287,20 +305,34 @@ void changeCol(Tactics &tact)
     }
     tact.score = -1;
 }
-Tactics search(int mh, int mw)
+Tactics search(int minh, int minw, int maxw)
 {
+    cerr << minw << " " << maxw << endl;
     int beamsize = 30;
     clock_t starttime = clock();
     priority_queue<Tactics, vector<Tactics>, greater<Tactics>> pque;
-    rep(j, 50)
+
+    rep(i, 25)
     {
         Tactics base;
-        initTactics(base, mh, mw);
+        initTactics(base, minh, minw);
         //initTactics(base, mh * (6), mw * (6));
         fitColorAndEval(base);
         pque.push(base);
     }
+    rep(i, 25)
+    {
+        Tactics base;
+        initTactics(base, minh, maxw);
+        //initTactics(base, mh * (6), mw * (6));
+        fitColorAndEval(base);
+        pque.push(base);
+    }
+#ifdef RASPI
+    while (double(clock() - starttime) / CLOCKS_PER_SEC < 9 * 8)
+#else
     while (double(clock() - starttime) / CLOCKS_PER_SEC < 9)
+#endif
     {
         auto tmp = pque;
         while (!pque.empty())
@@ -348,18 +380,18 @@ lld getOptimalArea(int mh, int mw)
         }
         curArea++;
     }
+    cerr << optimalEstimatedScore << endl;
     return optimalArea;
 }
-
+mt19937 mt_testgen;
 void runtest(int seed)
 {
-    mt19937 mt_testgen(seed);
     tiles.resize(n);
     rep(i, n)
     {
         int ch, cw;
-        ch = mt() % 9 + 2;
-        cw = mt() % 9 + 2;
+        ch = mt_testgen() % 9 + 2;
+        cw = mt_testgen() % 9 + 2;
         tiles[i].g.resize(ch);
         rep(j, ch)
         {
@@ -367,7 +399,7 @@ void runtest(int seed)
             string s;
             rep(k, cw)
             {
-                s += 'A' + mt() % 26;
+                s += 'A' + mt_testgen() % 26;
             }
             tiles[i].g[j] = s;
         }
@@ -375,64 +407,71 @@ void runtest(int seed)
         tiles[i].w = cw;
         t += ch * cw;
     }
-    int mh = -1, mw = -1;
+    int minh = -1, minw = -1;
     for (auto tile : tiles)
     {
-        chmax(mh, tile.h);
-        chmax(mw, tile.w);
+        chmax(minh, tile.h);
+        chmax(minw, tile.w);
     }
-    lld optimalArea = getOptimalArea(mh, mw);
-    chmax(optimalArea, (lld)100.5);
-    mh = 10;
-    mw = optimalArea / mh;
-    auto best = search(mh, mw);
-    cerr << "N = " << n << " ,P = " << p << " ,Seed = " << seed << endl;
+    lld optimalArea = getOptimalArea(minh, minw);
+    cerr << n << " " << p << " " << t << endl;
+    cerr << optimalArea << endl;
+    int maxw = max((int)(optimalArea / minh), minw);
+    Tactics best = search(minh, minw, maxw);
+
+    cerr << "Seed = " << seed << ", N = " << n << ", P = " << p << endl;
     cerr << "areaOfTiles     : " << t << endl;
     cerr << "areaOfAnswer    : " << best.h * best.w << endl;
     cerr << "compressionScore: " << fixed << setprecision(18) << best.compressionScore << endl;
     cerr << "lossinessScore  : " << fixed << setprecision(18) << best.lossinessScore << endl;
     cerr << "rawScore        : " << fixed << setprecision(18) << best.score << endl;
-    cerr << "loop              : " << loop << endl;
+    cerr << "loop            : " << loop << endl;
+    cout << seed << " " << fixed << setprecision(18) << best.score << " " << loop << endl;
     //printWrapCount(best);
 }
 int main(int argc, char *argv[])
 {
 #ifdef LOCAL
     //cerr << "local test. loop " << LOOPNUM << " times." << endl;
-    p = atof(argv[1]);
-    n = atoi(argv[2]);
     int seed;
-    if (argc == 3)
+    seed = atoi(argv[1]);
+    if (seed == -1)
     {
         seed = mt();
     }
-    else
+    mt_testgen.seed(seed);
+    n = mt_testgen() % 96 + 5;
+    p = urand(mt_testgen) * 0.9 + 0.05;
+    if (atoi(argv[2]) != -1)
     {
-        seed = atoi(argv[3]);
+        n = atoi(argv[2]);
     }
-
+    if (atof(argv[3]) != -1.0)
+    {
+        p = atof(argv[3]);
+    }
     //cerr << "P=" << p << " N=" << n << " seed=" << seed << endl;
     runtest(seed);
 #else
 
     init();
-    int mh = -1, mw = -1;
+    int minh = -1, minw = -1;
     for (auto tile : tiles)
     {
-        chmax(mh, tile.h);
-        chmax(mw, tile.w);
+        chmax(minh, tile.h);
+        chmax(minw, tile.w);
     }
-    lld optimalArea = getOptimalArea(mh, mw);
+    lld optimalArea = getOptimalArea(minh, minw);
     cerr << n << " " << p << " " << t << endl;
     cerr << optimalArea << endl;
-    mw = max((int)(optimalArea / mh), mw);
-    Tactics ans = search(mh, mw);
+    int maxw = max((int)(optimalArea / minh), minw);
+    Tactics ans = search(minh, minw, maxw);
+
     printTactics(ans);
 
     cerr << fixed << setprecision(18) << ans.score << endl;
     cerr << "loop: " << loop << endl;
-    cerr << "base size   : (" << mh << "," << mw << ")" << endl;
-    cerr << "actual size : (" << ans.h << "," << ans.w << ")" << endl;
+    cerr << "answer size : (" << ans.h << "," << ans.w << ")" << endl;
 #endif
     return 0;
 }
