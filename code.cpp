@@ -22,6 +22,9 @@ const int IINF = 1 << 30;
 const ll INF = 1ll << 60;
 const ll MOD = 1e9 + 7;
 
+const int dy[4] = {1, -1, 0, 0};
+const int dx[4] = {0, 0, 1, -1};
+
 class Tile
 {
 public:
@@ -47,6 +50,10 @@ bool operator>(const Tactics &t1, const Tactics &t2)
 {
     return t1.score > t2.score;
 };
+bool operator<(const Tactics &t1, const Tactics &t2)
+{
+    return t1.score < t2.score;
+};
 
 lld p;
 int n;
@@ -59,7 +66,7 @@ bool canPut(Tactics &tact, Tile &tile, int py, int px)
 {
     auto th = tile.h;
     auto tw = tile.w;
-    return (py + th <= tact.h && px + tw <= tact.w);
+    return (0 <= py && py + th <= tact.h && 0 <= px && px + tw <= tact.w);
 }
 
 int evalPiece(Tactics &tact, Tile &tile, PII pos)
@@ -145,15 +152,12 @@ void fitColorAndEval(Tactics &tact)
             {
                 med = 'A';
             }
-            else if (v.size() % 2 == 1)
+            else
             {
                 med = v[v.size() / 2];
             }
-            else
-            {
-                med = (v[v.size() / 2 - 1] + v[v.size() / 2]) / 2;
-            }
             tact.g[i][j] = med;
+            assert('A' <= med && med <= 'Z');
             for (auto col : v)
                 sumdiff += abs(med - col);
         }
@@ -280,18 +284,22 @@ void printTactics(Tactics &tact)
 
 void changePos(Tactics &tact)
 {
+
     rep(i, 2)
     {
-        int ri, rx, ry;
-        int cnt = 0;
+        int ri, rd;
+        int ny, nx;
         do
         {
             ri = mt() % n;
-            ry = mt() % tact.h;
-            rx = mt() % tact.w;
-            cnt++;
-        } while (canPut(tact, tiles[ri], ry, rx) == false && cnt < 999);
-        tact.pos[ri] = {ry, rx};
+            rd = mt() % 4;
+            //ny = mt() % tact.h;
+            ny = tact.pos[ri].first + dy[rd];
+            //nx = mt() % tact.w;
+            nx = tact.pos[ri].second + dx[rd];
+
+        } while (canPut(tact, tiles[ri], ny, nx) == false);
+        tact.pos[ri] = {ny, nx};
     }
 }
 
@@ -311,7 +319,8 @@ Tactics search(int minh, int minw, int maxw)
     int beamsize = 30;
     clock_t starttime = clock();
     priority_queue<Tactics, vector<Tactics>, greater<Tactics>> pque;
-
+    //priority_queue<Tactics, vector<Tactics>> pque;
+    /*
     rep(i, 25)
     {
         Tactics base;
@@ -327,6 +336,20 @@ Tactics search(int minh, int minw, int maxw)
         //initTactics(base, mh * (6), mw * (6));
         fitColorAndEval(base);
         pque.push(base);
+    }*/
+    int diff = max(1, (int)(sqrt(t - minh * minw) / beamsize));
+    int curh = minh;
+    int curw = minw;
+
+    while (curh * curw < t)
+    {
+        Tactics base;
+        initTactics(base, curh, curw);
+        //initTactics(base, mh * (6), mw * (6));
+        fitColorAndEval(base);
+        pque.push(base);
+        curh += diff;
+        curw += diff;
     }
 #ifdef RASPI
     while (double(clock() - starttime) / CLOCKS_PER_SEC < 9 * 8)
@@ -370,7 +393,7 @@ lld getOptimalArea(int mh, int mw)
     lld optimalArea = 0;
     lld curArea = mh * mw;
     lld optimalEstimatedScore = 1010101;
-    while (curArea <= 100 * 100)
+    while (curArea <= t)
     {
         lld curScore = estimateScore(curArea);
         if (curScore < optimalEstimatedScore)
@@ -383,7 +406,54 @@ lld getOptimalArea(int mh, int mw)
     cerr << optimalEstimatedScore << endl;
     return optimalArea;
 }
+
+void printVector(VI &v)
+{
+    for (auto x : v)
+    {
+        cerr << x << " ";
+    }
+    cerr << endl;
+}
+
+void printTileInfo(Tactics &tact)
+{
+    vector<VVI> countColor(tact.h, VVI(tact.w, VI(26, 0)));
+    VVI countTotal(tact.h, VI(tact.w, 0));
+    rep(i, n)
+    {
+        auto tile = tiles[i];
+        int sy = tact.pos[i].first;
+        int sx = tact.pos[i].second;
+        rep(y, tile.h)
+        {
+            rep(x, tile.w)
+            {
+                countColor[sy + y][sx + x][tile.g[y][x] - 'A']++;
+                countTotal[sy + y][sx + x]++;
+            }
+        }
+    }
+    rep(i, tact.h)
+    {
+        rep(j, tact.w)
+        {
+            printVector(countColor[i][j]);
+        }
+    }
+    cerr << "----------------------------------------------------" << endl;
+    rep(i, tact.h)
+    {
+        rep(j, tact.w)
+        {
+            cerr << countTotal[i][j] << " ";
+        }
+        cerr << endl;
+    }
+}
+
 mt19937 mt_testgen;
+
 void runtest(int seed)
 {
     tiles.resize(n);
@@ -427,7 +497,7 @@ void runtest(int seed)
     cerr << "rawScore        : " << fixed << setprecision(18) << best.score << endl;
     cerr << "loop            : " << loop << endl;
     cout << seed << " " << fixed << setprecision(18) << best.score << " " << loop << endl;
-    //printWrapCount(best);
+    //printTileInfo(best);
 }
 int main(int argc, char *argv[])
 {

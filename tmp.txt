@@ -1,8 +1,0 @@
-N = 5, P = 0.9, Seed = 9
-areaOfTiles     : 163
-areaOfAnswer    : 72
-compressionScore: 0.441717791411042945
-lossinessScore  : 0.243435582822085890
-rawScore        : 0.421889570552147244
-loop            : 21180
-9 0.421889570552147244

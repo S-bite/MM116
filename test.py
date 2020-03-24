@@ -27,7 +27,7 @@ def exec_parallel():
 
 def write_json(data):
     try:
-        with open("submissions.json", "r") as f:
+        with open("./viewer/submissions.json", "r") as f:
             json_data = json.load(f)
     except Exception as e:
         print(e)
@@ -36,7 +36,7 @@ def write_json(data):
     id = json_data["nextid"]
     json_data["nextid"] += 1
     json_data["submissions"][f"{id}"] = data
-    with open("submissions.json", "w") as f:
+    with open("./viewer/submissions.json", "w") as f:
         json.dump(json_data, f)
 
 
