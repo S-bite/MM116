@@ -58,7 +58,7 @@ int t = 0;
 int loop = 0;
 vector<Tile> tiles;
 vector<PII> shuffledPos;
-int minh,minw;
+
 bool canPut(Tactics &tact, Tile &tile, int py, int px)
 {
     auto th = tile.h;
@@ -75,8 +75,6 @@ int evalPiece(Tactics &tact, Tile &tile, PII pos)
     }
     return ret;
 }
-
-
 
 void fitPosAndEval(Tactics &tact)
 {
@@ -164,20 +162,6 @@ void fitColorAndEval(Tactics &tact)
     tact.lossinessScore = sumdiff / ((lld)12.5 * t);
     tact.score = tact.compressionScore * p + tact.lossinessScore * (1 - p);
 }
-void changeShape(Tactics &tact){
-    int d=0;
-    do{
-            
-        if (mt()%2==0){
-            d=1;
-        }else{
-            d=-1;
-        }
-    }while(minw>tact.w+d);
-    tact.w+=d;
-    fitPosAndEval(tact);
-}
-
 
 void init()
 {
@@ -359,8 +343,6 @@ Tactics search(int minh, int minw, int maxw)
             tmp.push(tact);
             fitPosAndEval(tact);
             tmp.push(tact);
-            changeShape(tact);
-            tmp.push(tact);
         }
         for (int i = 0; !tmp.empty() && i < beamsize; i++)
         {
@@ -473,7 +455,7 @@ void runtest(int seed)
         tiles[i].w = cw;
         t += ch * cw;
     }
-     minh = -1, minw = -1;
+    int minh = -1, minw = -1;
     for (auto tile : tiles)
     {
         chmax(minh, tile.h);
@@ -521,7 +503,7 @@ int main(int argc, char *argv[])
 #else
 
     init();
-    minh = -1, minw = -1;
+    int minh = -1, minw = -1;
     for (auto tile : tiles)
     {
         chmax(minh, tile.h);
